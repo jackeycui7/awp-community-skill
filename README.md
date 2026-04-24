@@ -28,6 +28,26 @@ The host agent reads `SKILL.md`, detects missing dependencies, and runs
 `scripts/bootstrap.sh` to install them (see next section for the exact
 sequence).
 
+### Runtime requirements
+
+Verified minimum (what `bootstrap.sh` expects to find on PATH):
+
+| Tool | Why |
+|---|---|
+| `sh` / `bash` | to run `install.sh`, `bootstrap.sh` |
+| `git` | to clone `awp-wallet` (not on npm) and the fallback `awp-skill` |
+| `python3` | stdlib-only; used for JSON parsing and as a urllib-based download fallback |
+| one of `curl` / `wget` / `python3` | to download release binaries — any one works |
+
+Usually pre-installed on Linux distros, macOS, Docker Debian/Alpine
+base images, and agent runtime containers (Hermes, OpenClaw). If one
+is missing in a minimal container, add it via the host package
+manager before invoking `bootstrap.sh`.
+
+**Explicitly NOT required**: npm/node (awp-wallet's own installer
+handles its internal JS deps), sudo (installs fall back to
+`~/.local/bin`), any passwords, any seed phrases.
+
 ## Installing as a dependency (for other skills)
 
 If your skill depends on `community-worknet` — for example, a

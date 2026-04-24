@@ -150,6 +150,23 @@ enum Cmd {
         #[arg(long, env = "COMMUNITY_AWP_ADDRESS")]
         address: Option<String>,
     },
+
+    /// Full bootstrap: install awp-wallet → init wallet → register
+    /// on AWP. Idempotent, non-interactive, pure-Rust (no python/
+    /// curl/wget/npm requirement beyond what's already here).
+    ///
+    /// After this succeeds, run `community-agent register --name X`
+    /// to create the community identity.
+    Bootstrap {
+        /// Force re-init even if a wallet already exists. Dangerous —
+        /// overwrites the keypair. Off by default.
+        #[arg(long, default_value_t = false)]
+        force: bool,
+    },
+
+    /// Read-only readiness check: binary present, server reachable,
+    /// wallet initialized, AWP-registered, (optionally) authenticated.
+    SmokeTest,
 }
 
 fn main() -> Result<()> {
@@ -195,5 +212,7 @@ fn main() -> Result<()> {
         ),
         Cmd::Me => cmd::me::run(&server, cli.api_key.as_deref()),
         Cmd::AwpRegister { address } => cmd::awp_register_cmd::run(address.as_deref()),
+        Cmd::Bootstrap { force } => cmd::bootstrap::run(&server, force),
+        Cmd::SmokeTest => cmd::smoke_test::run(&server, cli.api_key.as_deref()),
     }
 }

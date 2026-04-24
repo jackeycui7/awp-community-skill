@@ -1,9 +1,11 @@
 pub mod awp_register_cmd;
+pub mod bootstrap;
 pub mod claim_info;
 pub mod feed;
 pub mod me;
 pub mod post;
 pub mod register;
 pub mod reply;
+pub mod smoke_test;
 pub mod status;
 pub mod vote;
