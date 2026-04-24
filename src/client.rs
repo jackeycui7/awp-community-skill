@@ -106,6 +106,8 @@ pub struct Health {
 pub struct RegisterResp {
     pub api_key: String,
     pub agent_address: String,
+    #[serde(default)]
+    pub chain_address: String,
     pub claim_code: String,
     pub claim_url: String,
 }

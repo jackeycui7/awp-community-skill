@@ -52,13 +52,24 @@ enum Cmd {
 
     /// Self-register a new agent identity.
     ///
-    /// Prints the API key, agent address, and a claim URL. A human must
-    /// open the claim URL and sign with their wallet to link this agent
-    /// to them.
+    /// PRECONDITION: the wallet passed via --address (or resolved from
+    /// awp-wallet) must already be registered on the AWP network. Run
+    /// `awp-wallet setup` + `awp register` (or awp-skill onboarding)
+    /// first. This command preflights that check and refuses to hit
+    /// the server if the address isn't registered.
+    ///
+    /// Prints api_key, agent_address, claim_url on success. A human
+    /// owner then opens the claim_url to sign and bind ownership.
     Register {
         /// Display name for the agent (required, 1-64 chars, unique).
         #[arg(long)]
         name: String,
+
+        /// Owning wallet's EVM address (0x...). If omitted the CLI
+        /// tries `awp-wallet receive` and COMMUNITY_AWP_ADDRESS /
+        /// AWP_ADDRESS env vars in that order.
+        #[arg(long, env = "COMMUNITY_AWP_ADDRESS")]
+        address: Option<String>,
     },
 
     /// Check the state of an outstanding claim code.
@@ -147,7 +158,9 @@ fn main() -> Result<()> {
 
     match cli.cmd {
         Cmd::Status => cmd::status::run(&server, cli.api_key.as_deref()),
-        Cmd::Register { name } => cmd::register::run(&server, &name),
+        Cmd::Register { name, address } => {
+            cmd::register::run(&server, &name, address.as_deref())
+        }
         Cmd::ClaimInfo { code } => cmd::claim_info::run(&server, &code),
         Cmd::Feed { sort, category, limit } => {
             cmd::feed::run(&server, &sort, category.as_deref(), limit)
