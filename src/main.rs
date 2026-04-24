@@ -11,6 +11,7 @@ mod auth;
 mod awp_register;
 mod client;
 mod cmd;
+mod keyring;
 mod output;
 mod wallet;
 
@@ -167,14 +168,31 @@ enum Cmd {
     /// Read-only readiness check: binary present, server reachable,
     /// wallet initialized, AWP-registered, (optionally) authenticated.
     SmokeTest,
+
+    /// List agent identities stored in ~/.community/keys. Shows the
+    /// active one (tracked in ~/.community/current) with a masked
+    /// api_key preview — the raw key never leaves disk.
+    Keys,
+
+    /// Switch the active identity to <name>. Later commands that need
+    /// an api_key will read it from ~/.community/keys/<name>.json.
+    Use {
+        /// Identity name (matches the --name passed to `register`).
+        name: String,
+    },
 }
 
 fn main() -> Result<()> {
     let cli = Cli::parse();
     let server = cli.server.trim_end_matches('/').to_string();
 
+    // Resolve api_key ONCE from: --api-key flag, COMMUNITY_API_KEY env,
+    // or the keyring's active identity (~/.community/current). After
+    // this, subcommands never touch the raw flag/env themselves.
+    let api_key = keyring::resolve_api_key(cli.api_key.as_deref());
+
     match cli.cmd {
-        Cmd::Status => cmd::status::run(&server, cli.api_key.as_deref()),
+        Cmd::Status => cmd::status::run(&server, api_key.as_deref()),
         Cmd::Register { name, address } => {
             cmd::register::run(&server, &name, address.as_deref())
         }
@@ -184,35 +202,37 @@ fn main() -> Result<()> {
         }
         Cmd::Post { title, body, category } => cmd::post::run(
             &server,
-            cli.api_key.as_deref(),
+            api_key.as_deref(),
             &title,
             &body,
             category.as_deref(),
         ),
         Cmd::Reply { post_id, body, parent_id } => cmd::reply::run(
             &server,
-            cli.api_key.as_deref(),
+            api_key.as_deref(),
             post_id,
             &body,
             parent_id,
         ),
         Cmd::Vote { target_type, target_id } => cmd::vote::run(
             &server,
-            cli.api_key.as_deref(),
+            api_key.as_deref(),
             &target_type,
             target_id,
             true,
         ),
         Cmd::Unvote { target_type, target_id } => cmd::vote::run(
             &server,
-            cli.api_key.as_deref(),
+            api_key.as_deref(),
             &target_type,
             target_id,
             false,
         ),
-        Cmd::Me => cmd::me::run(&server, cli.api_key.as_deref()),
+        Cmd::Me => cmd::me::run(&server, api_key.as_deref()),
         Cmd::AwpRegister { address } => cmd::awp_register_cmd::run(address.as_deref()),
         Cmd::Bootstrap { force } => cmd::bootstrap::run(&server, force),
-        Cmd::SmokeTest => cmd::smoke_test::run(&server, cli.api_key.as_deref()),
+        Cmd::SmokeTest => cmd::smoke_test::run(&server, api_key.as_deref()),
+        Cmd::Keys => cmd::keys::run(),
+        Cmd::Use { name } => cmd::use_key::run(&name),
     }
 }

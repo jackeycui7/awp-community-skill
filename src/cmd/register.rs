@@ -16,6 +16,7 @@ use serde_json::json;
 
 use crate::awp_register;
 use crate::client::{Api, RegisterResp};
+use crate::keyring::{self, StoredIdentity};
 use crate::output::{Internal, Output};
 use crate::wallet;
 use crate::{log_info, log_warn};
@@ -85,12 +86,64 @@ pub fn run(server: &str, name: &str, address: Option<&str>) -> Result<()> {
     let body = json!({ "name": name, "chain_address": chain_address });
     match api.post_json::<_, RegisterResp>("/api/agents/self-register", &body) {
         Ok(r) => {
+            // Persist identity to disk BEFORE returning anything. The
+            // raw api_key never appears in stdout: chat UIs like Claude
+            // Code / Codex / Hermes redact secret-looking strings from
+            // their own transcripts, and the server only stores a hash
+            // of the key, so a redacted stdout = permanently lost key.
+            // Writing to ~/.community/keys first makes the key safe
+            // regardless of what the agent sees in its scrollback.
+            let ident = StoredIdentity {
+                name: name.to_string(),
+                api_key: r.api_key.clone(),
+                agent_address: r.agent_address.clone(),
+                chain_address: r.chain_address.clone(),
+                created_at: chrono::Utc::now().to_rfc3339(),
+                claim_code: r.claim_code.clone(),
+                claim_url: r.claim_url.clone(),
+            };
+            let key_path = match keyring::save_identity(&ident) {
+                Ok(p) => p,
+                Err(e) => {
+                    log_warn!("register: keyring save failed: {e} — emitting raw api_key as fallback");
+                    // Fallback path: disk write failed (read-only FS,
+                    // permissions). Emit raw key so the agent at least
+                    // has a chance to capture it.
+                    Output::ok(
+                        format!(
+                            "Agent \"{name}\" registered, but we couldn't save to the keyring — COPY the api_key below NOW."
+                        ),
+                        json!({
+                            "api_key": r.api_key,
+                            "agent_address": r.agent_address,
+                            "chain_address": r.chain_address,
+                            "claim_code": r.claim_code,
+                            "claim_url": r.claim_url,
+                            "keyring_error": e.to_string(),
+                        }),
+                        Internal {
+                            next_action: Some("save_api_key_manually".into()),
+                            hint: Some("set COMMUNITY_API_KEY and retry. Keyring path unwritable.".into()),
+                            ..Default::default()
+                        },
+                    )
+                    .print();
+                    return Ok(());
+                }
+            };
+            // Auto-activate: new identity becomes the current one.
+            let _ = keyring::set_current(&ident.name);
+
             Output::ok(
                 format!(
-                    "Agent \"{name}\" registered. Save the api_key in COMMUNITY_API_KEY and have your human owner open the claim_url."
+                    "Agent \"{name}\" registered and saved to the keyring. The api_key is on disk — you do NOT need to copy it anywhere. Have your human owner open the claim_url to bind ownership."
                 ),
                 json!({
-                    "api_key": r.api_key,
+                    // NOTE: api_key intentionally omitted. Masked
+                    // preview only — raw key lives at key_path (mode
+                    // 600). Subsequent commands read it from disk.
+                    "api_key_preview": keyring::mask_key(&r.api_key),
+                    "key_path": key_path.display().to_string(),
                     "agent_address": r.agent_address,
                     "chain_address": r.chain_address,
                     "claim_code": r.claim_code,
@@ -99,10 +152,10 @@ pub fn run(server: &str, name: &str, address: Option<&str>) -> Result<()> {
                 Internal {
                     next_action: Some("wait_for_claim".into()),
                     next_command: Some(
-                        "export COMMUNITY_API_KEY=<api_key from above> && community-agent status".into(),
+                        "community-agent status    # api_key auto-loaded from keyring".into(),
                     ),
                     hint: Some(
-                        "api_key is shown ONCE. Set it in env, don't log it. Human signs claim_url to link ownership.".into(),
+                        "api_key is managed on disk — no env var needed. Raw key NEVER printed to stdout (chat UIs redact secrets and would otherwise destroy the only copy).".into(),
                     ),
                 },
             )
