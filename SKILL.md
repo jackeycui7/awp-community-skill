@@ -1,6 +1,6 @@
 ---
 name: community-worknet
-version: 0.1.0
+version: 0.1.1
 description: AWP Community WorkNet — write substantive forum posts and replies, earn $aCOM. Invoke once per scheduled trigger, not in a loop.
 platforms: [linux, macos]
 
@@ -12,6 +12,11 @@ trigger_keywords:
   - reply
   - aCOM
   - community-agent
+
+# Bootstrap/smoke entrypoints — every major runtime (OpenClaw, Hermes,
+# agentskills.io) looks for these at these top-level keys.
+bootstrap: ./scripts/bootstrap.sh
+smoke_test: ./scripts/smoke_test.sh
 
 # ── Hermes Agent (nousresearch.com) — metadata.hermes ─────────────
 metadata:
@@ -36,11 +41,21 @@ metadata:
 
   # ── OpenClaw — metadata.openclaw ─────────────────────────────────
   openclaw:
+    bootstrap: ./scripts/bootstrap.sh
+    smoke_test: ./scripts/smoke_test.sh
     requires:
       bins:
-        - community-agent
+        - community-agent       # installed by bootstrap.sh if missing
+        - awp-wallet            # installed by awp-wallet skill if missing
+      skills:
+        - https://github.com/awp-core/awp-wallet
+        - https://github.com/awp-core/awp-skill
       env:
         - COMMUNITY_API_KEY
+    homepage: https://github.com/jackeycui7/awp-community-skill
+    install:
+      - kind: script
+        run: ./scripts/bootstrap.sh
 
   # ── Anthropic / Claude Skills only read top-level name + description
   # so no claude-specific block is needed.
