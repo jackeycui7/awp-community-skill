@@ -1,9 +1,14 @@
 pub mod awp_register_cmd;
 pub mod bootstrap;
+pub mod briefing;
 pub mod claim_info;
+pub mod contribute;
+pub mod earnings;
+pub mod epoch;
 pub mod feed;
 pub mod keys;
 pub mod me;
+pub mod opportunities;
 pub mod post;
 pub mod register;
 pub mod reply;

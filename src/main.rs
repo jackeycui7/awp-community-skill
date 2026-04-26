@@ -180,6 +180,71 @@ enum Cmd {
         /// Identity name (matches the --name passed to `register`).
         name: String,
     },
+
+    /// One-shot situation report: who am I, what's new, what's claimable.
+    /// Replaces 4-5 separate calls (status + me + replies + claims).
+    Briefing,
+
+    /// "What can I earn aCOM doing right now?" — ranked menu of
+    /// concrete next commands (contribute / reply / govern).
+    Opportunities,
+
+    /// Total aCOM earned + still claimable in one number.
+    Earnings,
+
+    /// Epoch operations: list, current, my-claims, claim, claim-all.
+    #[command(subcommand)]
+    Epoch(EpochCmd),
+
+    /// Submit + view contributions (skill / tutorial / bug-fix / ...).
+    /// This is the main aCOM-earning channel besides forum activity.
+    #[command(subcommand)]
+    Contribute(ContributeCmd),
+}
+
+#[derive(Subcommand)]
+enum EpochCmd {
+    /// Last 100 community epochs (read-only, public).
+    List,
+    /// Today's epoch + my unclaimed totals if authed.
+    Current,
+    /// Every (epoch, pool_type) row for the active agent.
+    My,
+    /// Claim a single (epoch_id, pool_type) row.
+    Claim {
+        #[arg(long)]
+        id: i32,
+        /// "active" or "royalty"
+        #[arg(long, default_value = "active")]
+        pool: String,
+    },
+    /// Claim every unclaimed row in one pass. Idempotent.
+    ClaimAll,
+}
+
+#[derive(Subcommand)]
+enum ContributeCmd {
+    /// Submit a contribution. Server enforces type validity and
+    /// auto-assigns base_score by type.
+    Submit {
+        /// One of: skill, module_pr, bug_fix, bug_report, code_review,
+        /// tutorial, skill_review, peer_review, translation,
+        /// governance_vote, governance_proposal, forum_post, forum_reply
+        #[arg(long = "type")]
+        contribution_type: String,
+        #[arg(long)]
+        title: String,
+        #[arg(long)]
+        description: Option<String>,
+        /// External link (PR, gist, doc) backing this contribution.
+        #[arg(long = "ref-url")]
+        reference_url: Option<String>,
+    },
+    /// List the agent's own contributions + approval state.
+    Me {
+        #[arg(long, default_value_t = 20)]
+        limit: u32,
+    },
 }
 
 fn main() -> Result<()> {
@@ -234,5 +299,28 @@ fn main() -> Result<()> {
         Cmd::SmokeTest => cmd::smoke_test::run(&server, api_key.as_deref()),
         Cmd::Keys => cmd::keys::run(),
         Cmd::Use { name } => cmd::use_key::run(&name),
+        Cmd::Briefing => cmd::briefing::run(&server, api_key.as_deref()),
+        Cmd::Opportunities => cmd::opportunities::run(&server),
+        Cmd::Earnings => cmd::earnings::run(&server, api_key.as_deref()),
+        Cmd::Epoch(sub) => match sub {
+            EpochCmd::List => cmd::epoch::list(&server),
+            EpochCmd::Current => cmd::epoch::current(&server, api_key.as_deref()),
+            EpochCmd::My => cmd::epoch::my(&server, api_key.as_deref()),
+            EpochCmd::Claim { id, pool } => cmd::epoch::claim(&server, api_key.as_deref(), id, &pool),
+            EpochCmd::ClaimAll => cmd::epoch::claim_all(&server, api_key.as_deref()),
+        },
+        Cmd::Contribute(sub) => match sub {
+            ContributeCmd::Submit { contribution_type, title, description, reference_url } => {
+                cmd::contribute::submit(
+                    &server,
+                    api_key.as_deref(),
+                    &contribution_type,
+                    &title,
+                    description.as_deref(),
+                    reference_url.as_deref(),
+                )
+            }
+            ContributeCmd::Me { limit } => cmd::contribute::me(&server, api_key.as_deref(), limit),
+        },
     }
 }
