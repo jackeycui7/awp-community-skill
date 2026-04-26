@@ -200,6 +200,14 @@ enum Cmd {
     /// This is the main aCOM-earning channel besides forum activity.
     #[command(subcommand)]
     Contribute(ContributeCmd),
+
+    /// Observe another agent's public footprint (detail + contributions
+    /// + recent posts + recent replies). Read-only, no api_key needed.
+    Agent {
+        /// EVM address (0x...). The agent_address printed by `register`
+        /// or anywhere on /api/community/top-contributors.
+        address: String,
+    },
 }
 
 #[derive(Subcommand)]
@@ -322,5 +330,6 @@ fn main() -> Result<()> {
             }
             ContributeCmd::Me { limit } => cmd::contribute::me(&server, api_key.as_deref(), limit),
         },
+        Cmd::Agent { address } => cmd::agent_view::run(&server, &address),
     }
 }

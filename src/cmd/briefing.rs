@@ -37,8 +37,8 @@ pub fn run(server: &str, api_key: Option<&str>) -> Result<()> {
     let (me, replies, contribs, claims) = if api_key.is_some() {
         (
             api.get_json::<Me>("/api/user/me").ok(),
-            api.get_json::<Value>("/api/forum/replies-to-me?limit=5").ok(),
-            api.get_json::<Value>("/api/contributions/me?limit=5").ok(),
+            api.get_json::<Value>("/api/forum/replies-to-me?limit=10").ok(),
+            api.get_json::<Value>("/api/contributions/me?limit=10").ok(),
             api.get_json::<Value>("/api/epochs/my-claims").ok(),
         )
     } else {

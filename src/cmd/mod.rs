@@ -1,3 +1,4 @@
+pub mod agent_view;
 pub mod awp_register_cmd;
 pub mod bootstrap;
 pub mod briefing;
